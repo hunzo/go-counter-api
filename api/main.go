@@ -1,7 +1,6 @@
 package main
 
 import (
-	"api/validate"
 	"context"
 	"os"
 
@@ -25,28 +24,39 @@ func main() {
 	})
 	app.Get("/", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
-			"info":          "counter api",
-			"reset_counter": "GET /api/set",
-			"get_counter":   "GET /api/get",
-			"incr_counter":  "GET /api/count",
+			"info":                 "counter api",
+			"set_your_counter_key": "GET /api/set?key=yourKey",
+			"get_counter":          "GET /api/get?key=yourKey",
+			"incr_counter":         "GET /api/inc?key=yourKey",
+			"decr_counter":         "GET /api/dec?key=yourKey",
 		})
 	})
 
-	route := app.Group("/api", validate.HeaderValidator)
+	route := app.Group("/api")
 
 	route.Get("/set", func(c *fiber.Ctx) error {
-		err := rdb.Set(ctx, "counter", 0, 0).Err()
+		key := c.Query("key")
+
+		if key == "" {
+			return c.JSON(fiber.ErrBadRequest)
+		}
+
+		err := rdb.Set(ctx, key, 0, 0).Err()
 		if err != nil {
 			return err
 		}
 		return c.JSON(fiber.Map{
-			"info":  "reset_counter",
+			"info":  "call with ?key=yourkey",
 			"start": 0,
 		})
 	})
 
 	route.Get("/get", func(c *fiber.Ctx) error {
-		val, err := rdb.Get(ctx, "counter").Result()
+		key := c.Query("key")
+		if key == "" {
+			return c.JSON(fiber.ErrBadRequest)
+		}
+		val, err := rdb.Get(ctx, key).Result()
 		if err != nil {
 			return err
 		}
@@ -55,8 +65,13 @@ func main() {
 		})
 	})
 
-	route.Get("/count", func(c *fiber.Ctx) error {
-		result, err := rdb.Incr(ctx, "counter").Result()
+	route.Get("/inc", func(c *fiber.Ctx) error {
+		key := c.Query("key")
+		if key == "" {
+			return c.JSON(fiber.ErrBadRequest)
+		}
+
+		result, err := rdb.Incr(ctx, key).Result()
 		if err != nil {
 			return err
 		}
@@ -67,5 +82,21 @@ func main() {
 		})
 	})
 
+	route.Get("/dec", func(c *fiber.Ctx) error {
+		key := c.Query("key")
+		if key == "" {
+			return c.JSON(fiber.ErrBadRequest)
+		}
+
+		result, err := rdb.Decr(ctx, key).Result()
+		if err != nil {
+			return err
+		}
+
+		return c.JSON(fiber.Map{
+			"success": true,
+			"result":  result,
+		})
+	})
 	app.Listen(":8080")
 }
